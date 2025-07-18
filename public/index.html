@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MiranCourt</title>
+</head>
+<body>
+  <h1>Welcome to MiranCourt</h1>
+  <form id="contact-form">
+    <input type="text" name="name" placeholder="Name" required />
+    <input type="email" name="email" placeholder="Email" required />
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    document.getElementById("contact-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = {
+        name: e.target.name.value,
+        email: e.target.email.value,
+      };
+
+      const res = await fetch("/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      alert(await res.text());
+    });
+  </script>
+</body>
+</html>
