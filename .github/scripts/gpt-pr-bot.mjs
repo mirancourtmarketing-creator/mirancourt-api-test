@@ -1,7 +1,7 @@
 import fs from "fs";
 import { exec, execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
-import { OpenAI } from "openai";
+import OpenAI from "openai";
 
 const octo = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
