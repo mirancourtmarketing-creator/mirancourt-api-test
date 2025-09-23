@@ -85,8 +85,14 @@ app.post('/api/post', async (req, res) => {
     });
     const result = await tweetResp.json();
     const tweetId = result.data?.id;
-    return res.json({ status: 'posted', postUrl: tweetId ? `https://twitter.com/user/status/${tweetId}` : null });
+    rreturn res.json({ id: tweetId, text: result.data?.text });});
   } catch (err) {
+        
+    
+        
+        
+
+    
     console.error('Posting error', err);
     return res.status(500).json({ error: 'Failed to post tweet' });
   }
