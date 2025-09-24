@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
 // This simple server implements X (Twitter) OAuth, a posting endpoint, and a status endpoint.
 // In a real application you would store tokens securely and handle error cases.
@@ -8,13 +10,38 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// In-memory store for connected Twitter accounts and their tokens
-const accounts = {};
+const TOKEN_STORE_PATH = path.join(__dirname, 'tokens.json');
 
-// TODO: replace these environment variables with your Twitter app credentials
-const CLIENT_ID = process.env.TWITTER_CLIENT_ID || 'your-client-id';
-const CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || 'your-client-secret';
-const REDIRECT_URI = process.env.TWITTER_REDIRECT_URI || 'http://localhost:3000/api/auth/twitter/callback';
+const loadAccounts = () => {
+  try {
+    const raw = fs.readFileSync(TOKEN_STORE_PATH, 'utf8');
+    return JSON.parse(raw);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error('Failed to load token store', err);
+    }
+    return {};
+  }
+};
+
+const persistAccounts = (accounts) => {
+  try {
+    fs.writeFileSync(TOKEN_STORE_PATH, JSON.stringify(accounts, null, 2));
+  } catch (err) {
+    console.error('Failed to persist token store', err);
+  }
+};
+
+// Persistent store for connected Twitter accounts and their tokens
+const accounts = loadAccounts();
+
+const CLIENT_ID = process.env.TWITTER_CLIENT_ID;
+const CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET;
+const REDIRECT_URI = process.env.TWITTER_REDIRECT_URI;
+
+if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+  throw new Error('TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET, and TWITTER_REDIRECT_URI must be set');
+}
 
 /**
  * Step 1: Initiate the OAuth flow by redirecting the user to X to grant access.
@@ -40,7 +67,7 @@ app.get('/api/auth/twitter/callback', async (req, res) => {
     params.append('client_id', CLIENT_ID);
     params.append('redirect_uri', REDIRECT_URI);
     params.append('code_verifier', 'challenge');
-    const response = await fetch('https://api.twitter.com/2/oauth2/token', {
+    const response = await fetch('https://api.x.com/2/oauth2/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -49,12 +76,27 @@ app.get('/api/auth/twitter/callback', async (req, res) => {
       body: params
     });
     const data = await response.json();
-    // Store tokens in memory under a default account key
+    if (!response.ok) {
+      console.error('OAuth response error', data);
+      return res.status(response.status).send('OAuth failed');
+    }
+    console.log('Token response from X', {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_in: data.expires_in,
+      expires_at: data.expires_in ? Date.now() + data.expires_in * 1000 : null
+    });
+    // Store tokens in persistent store under a default account key
     accounts.default = {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
-      expires_at: Date.now() + data.expires_in * 1000
+      expires_in: data.expires_in,
+      scope: data.scope,
+      token_type: data.token_type,
+      received_at: Date.now(),
+      expires_at: data.expires_in ? Date.now() + data.expires_in * 1000 : null
     };
+    persistAccounts(accounts);
     res.send('Connected your X account successfully.');
   } catch (err) {
     console.error('OAuth error', err);
@@ -84,8 +126,13 @@ app.post('/api/post', async (req, res) => {
       body: JSON.stringify({ text: content })
     });
     const result = await tweetResp.json();
+    if (!tweetResp.ok) {
+      console.error('Post tweet response error', result);
+      return res.status(tweetResp.status).json({ error: 'Failed to post tweet' });
+    }
     const tweetId = result.data?.id;
-    rreturn res.json({ id: tweetId, text: result.data?.text });});
+    const tweetUrl = tweetId ? `https://twitter.com/i/web/status/${tweetId}` : null;
+    return res.json({ id: tweetId, url: tweetUrl });
   } catch (err) {
         
     
