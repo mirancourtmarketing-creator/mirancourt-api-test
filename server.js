@@ -83,9 +83,10 @@ app.post('/api/post', async (req, res) => {
       },
       body: JSON.stringify({ text: content })
     });
-    const result = await tweetResp.json();
     const tweetId = result.data?.id;
-    rreturn res.json({ id: tweetId, text: result.data?.text });});
+const tweetUrl = tweetId ? `https://twitter.com/i/web/status/${tweetId}` : null;
+return res.json({ id: tweetId, url: tweetUrl });
+});
   } catch (err) {
         
     
